@@ -7,7 +7,7 @@ function ControlButton({ onClick, title, children }: { onClick: () => void; titl
     <button
       onClick={onClick}
       title={title}
-      className="cursor-pointer w-[30px] h-[30px] rounded-full grid place-items-center border text-[12px]"
+      className="cursor-pointer flex-shrink-0 w-[34px] h-[34px] rounded-full grid place-items-center border text-[13px]"
       style={{ borderColor: "rgba(237,224,206,.16)", color: "rgba(237,224,206,.75)" }}
     >
       {children}
@@ -64,8 +64,8 @@ export function NowPlaying() {
           </div>
 
           {connected ? (
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center gap-2.5">
+            <div className="flex flex-col gap-3.5">
+              <div className="flex items-center gap-3">
                 <ControlButton onClick={previous} title="Previous">
                   ⏮
                 </ControlButton>
@@ -75,16 +75,18 @@ export function NowPlaying() {
                 <ControlButton onClick={next} title="Next">
                   ⏭
                 </ControlButton>
+              </div>
+              <div className="flex items-center gap-4">
                 <button
                   onClick={() => setLibraryOpen(true)}
-                  className="cursor-pointer rounded-full text-[11px] tracking-[.05em] border"
-                  style={{ padding: "8px 16px", color: "rgba(237,224,206,.75)", borderColor: "rgba(237,224,206,.16)" }}
+                  className="cursor-pointer whitespace-nowrap rounded-full text-[11px] tracking-[.05em] border"
+                  style={{ padding: "9px 18px", color: "rgba(237,224,206,.75)", borderColor: "rgba(237,224,206,.16)" }}
                 >
                   Choose music
                 </button>
                 <button
                   onClick={disconnect}
-                  className="cursor-pointer text-[11px] underline decoration-dotted"
+                  className="cursor-pointer whitespace-nowrap text-[11px] underline decoration-dotted"
                   style={{ color: "rgba(237,224,206,.35)" }}
                 >
                   disconnect
