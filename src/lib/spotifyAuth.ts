@@ -1,5 +1,5 @@
 const CLIENT_ID = "39510ca6a53d40bf8bc239fd9296e64b";
-const SCOPES = "user-read-currently-playing";
+const SCOPES = "user-read-currently-playing user-read-playback-state user-modify-playback-state playlist-read-private";
 const TOKEN_KEY = "cozyfocus.spotify.tokens";
 const VERIFIER_KEY = "cozyfocus.spotify.verifier";
 const STATE_KEY = "cozyfocus.spotify.state";
@@ -8,6 +8,7 @@ interface TokenSet {
   accessToken: string;
   refreshToken: string;
   expiresAt: number;
+  scope: string;
 }
 
 function redirectUri() {
@@ -42,18 +43,25 @@ function loadTokens(): TokenSet | null {
   }
 }
 
-function saveTokens(data: { access_token: string; refresh_token?: string; expires_in: number }) {
+function saveTokens(data: { access_token: string; refresh_token?: string; expires_in: number; scope?: string }) {
   const existing = loadTokens();
   const tokens: TokenSet = {
     accessToken: data.access_token,
     refreshToken: data.refresh_token ?? existing?.refreshToken ?? "",
     expiresAt: Date.now() + data.expires_in * 1000,
+    scope: data.scope ?? existing?.scope ?? "",
   };
   localStorage.setItem(TOKEN_KEY, JSON.stringify(tokens));
 }
 
+function hasRequiredScope(scope: string) {
+  const granted = new Set(scope.split(" "));
+  return SCOPES.split(" ").every((s) => granted.has(s));
+}
+
 export function isConnected() {
-  return !!loadTokens()?.refreshToken;
+  const tokens = loadTokens();
+  return !!tokens?.refreshToken && hasRequiredScope(tokens.scope);
 }
 
 export function logout() {
