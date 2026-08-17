@@ -1,0 +1,115 @@
+@import "tailwindcss";
+@import "@fontsource/eb-garamond/400.css";
+@import "@fontsource/eb-garamond/500.css";
+@import "@fontsource/eb-garamond/400-italic.css";
+@import "@fontsource/manrope/400.css";
+@import "@fontsource/manrope/600.css";
+
+:root {
+  --ink: #0e0906;
+  --cream: #ede0ce;
+  --ember: #c96a3c;
+  --ember-light: #e8a05c;
+  --cool: #7fa8a0;
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='220' height='220' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+  --stripe: repeating-linear-gradient(135deg, rgba(237, 224, 206, 0.1) 0 2px, rgba(237, 224, 206, 0) 2px 9px);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--ink);
+  color: var(--cream);
+  font-family: Manrope, sans-serif;
+  overflow: hidden;
+}
+
+a {
+  color: var(--ember);
+  text-decoration: none;
+}
+a:hover {
+  color: var(--ember-light);
+}
+
+.font-serif-cf {
+  font-family: "EB Garamond", serif;
+}
+
+@keyframes rainfall {
+  from {
+    background-position: 0 -600px, 0 -300px;
+  }
+  to {
+    background-position: -120px 600px, -40px 900px;
+  }
+}
+@keyframes flicker {
+  0% {
+    opacity: 0.62;
+    transform: scale(1);
+  }
+  22% {
+    opacity: 0.86;
+    transform: scale(1.03);
+  }
+  41% {
+    opacity: 0.55;
+    transform: scale(0.99);
+  }
+  64% {
+    opacity: 0.9;
+    transform: scale(1.04);
+  }
+  83% {
+    opacity: 0.66;
+    transform: scale(1.01);
+  }
+  100% {
+    opacity: 0.62;
+    transform: scale(1);
+  }
+}
+@keyframes drift {
+  from {
+    transform: translate3d(-4%, 0, 0);
+  }
+  to {
+    transform: translate3d(4%, -2%, 0);
+  }
+}
+@keyframes breathe {
+  0% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0.5;
+  }
+}
+
+.anim-rainfall {
+  animation: rainfall 18s linear infinite;
+}
+.anim-flicker {
+  animation: flicker 9s ease-in-out infinite;
+}
+.anim-drift {
+  animation: drift 64s ease-in-out infinite alternate;
+}
+.anim-breathe {
+  animation: breathe 7s ease-in-out infinite;
+}
+
+.transition-fade {
+  transition:
+    opacity 900ms ease,
+    filter 900ms ease;
+}
