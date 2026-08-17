@@ -1,29 +1,47 @@
 import type { LayerKey, LevelState } from "./scenes";
 
 const LAYER_MAX: Record<LayerKey, number> = {
-  rain: 0.32,
-  wind: 0.28,
+  rain: 0.55,
+  wind: 0.4,
   cafe: 0.2,
-  fire: 0.55,
-  keys: 0.4,
-  thunder: 0.7,
+  fire: 0.6,
+  keys: 0.5,
+  thunder: 0.8,
+};
+
+type LoopKey = "rain" | "wind" | "fire";
+type SampleKey = "keys" | "thunder";
+
+const LOOP_FILES: Record<LoopKey, string> = {
+  rain: "/audio/rain.mp3",
+  wind: "/audio/wind.mp3",
+  fire: "/audio/fire.mp3",
+};
+
+const SAMPLE_FILES: Record<SampleKey, string> = {
+  keys: "/audio/keys.mp3",
+  thunder: "/audio/thunder.mp3",
 };
 
 interface ContinuousNode {
   source: AudioBufferSourceNode;
-  filter: BiquadFilterNode;
   gain: GainNode;
 }
 
 type Ctor = typeof AudioContext;
 
-// All six ambient layers are synthesized in the browser with the Web Audio
-// API (filtered/shaped noise) rather than streamed from audio files, so the
-// app has no external audio assets to fetch, license, or ship.
+// Rain, wind and fire are real CC0 recordings (see public/audio/CREDITS.md),
+// looped through the Web Audio API. Café has no clean CC0 source, so it stays
+// synthesized (filtered noise). Keys and thunder are real one-shot samples
+// triggered at randomized intervals instead of played as loops.
 export class AmbientEngine {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private noiseBuffer: AudioBuffer | null = null;
+  private loopBuffers: Partial<Record<LoopKey, AudioBuffer>> = {};
+  private sampleBuffers: Partial<Record<SampleKey, AudioBuffer>> = {};
+  private bufferLoadPromise: Promise<void> | null = null;
+
   private continuous: Partial<Record<LayerKey, ContinuousNode>> = {};
   private levels: LevelState = { rain: 0, fire: 0, cafe: 0, wind: 0, keys: 0, thunder: 0 };
   private playing = false;
@@ -50,82 +68,97 @@ export class AmbientEngine {
     return buffer;
   }
 
-  private buildContinuous(key: "rain" | "wind" | "cafe") {
+  private async loadBuffers(): Promise<void> {
+    if (this.bufferLoadPromise) return this.bufferLoadPromise;
+    const ctx = this.getCtx();
+    const load = async (url: string) => {
+      const res = await fetch(url);
+      const arr = await res.arrayBuffer();
+      return ctx.decodeAudioData(arr);
+    };
+    this.bufferLoadPromise = (async () => {
+      await Promise.all([
+        ...(Object.entries(LOOP_FILES) as [LoopKey, string][]).map(async ([key, url]) => {
+          try {
+            this.loopBuffers[key] = await load(url);
+          } catch {
+            console.warn(`cozy-focus: failed to load ambient loop "${key}"`);
+          }
+        }),
+        ...(Object.entries(SAMPLE_FILES) as [SampleKey, string][]).map(async ([key, url]) => {
+          try {
+            this.sampleBuffers[key] = await load(url);
+          } catch {
+            console.warn(`cozy-focus: failed to load ambient sample "${key}"`);
+          }
+        }),
+      ]);
+    })();
+    return this.bufferLoadPromise;
+  }
+
+  private buildLoopLayer(key: LoopKey) {
+    const buffer = this.loopBuffers[key];
+    if (!buffer || this.continuous[key]) return;
+    const ctx = this.getCtx();
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.loop = true;
+    const gain = ctx.createGain();
+    gain.gain.value = (this.levels[key] / 100) * LAYER_MAX[key];
+    source.connect(gain);
+    gain.connect(this.master!);
+    source.start();
+    this.continuous[key] = { source, gain };
+  }
+
+  private buildCafeSynth() {
+    if (this.continuous.cafe) return;
     const ctx = this.getCtx();
     const source = ctx.createBufferSource();
     source.buffer = this.noiseBuffer!;
     source.loop = true;
     const filter = ctx.createBiquadFilter();
+    filter.type = "bandpass";
+    filter.frequency.value = 900;
+    filter.Q.value = 0.6;
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 0.15;
+    const lfoGain = ctx.createGain();
+    lfoGain.gain.value = 150;
+    lfo.connect(lfoGain);
+    lfoGain.connect(filter.frequency);
+    lfo.start();
     const gain = ctx.createGain();
-    const initial = (this.levels[key] / 100) * LAYER_MAX[key];
-    gain.gain.value = initial;
-
-    if (key === "rain") {
-      filter.type = "highpass";
-      filter.frequency.value = 900;
-      filter.Q.value = 0.7;
-    } else if (key === "wind") {
-      filter.type = "lowpass";
-      filter.frequency.value = 500;
-      filter.Q.value = 0.6;
-      const lfo = ctx.createOscillator();
-      lfo.frequency.value = 0.07;
-      const lfoGain = ctx.createGain();
-      lfoGain.gain.value = 220;
-      lfo.connect(lfoGain);
-      lfoGain.connect(filter.frequency);
-      lfo.start();
-    } else {
-      filter.type = "bandpass";
-      filter.frequency.value = 900;
-      filter.Q.value = 0.6;
-      const lfo = ctx.createOscillator();
-      lfo.frequency.value = 0.15;
-      const lfoGain = ctx.createGain();
-      lfoGain.gain.value = 150;
-      lfo.connect(lfoGain);
-      lfoGain.connect(filter.frequency);
-      lfo.start();
-    }
-
+    gain.gain.value = (this.levels.cafe / 100) * LAYER_MAX.cafe;
     source.connect(filter);
     filter.connect(gain);
     gain.connect(this.master!);
     source.start();
-    this.continuous[key] = { source, filter, gain };
+    this.continuous.cafe = { source, gain };
   }
 
-  private burst(opts: {
-    type: BiquadFilterType;
-    freq: number;
-    q: number;
-    duration: number;
-    gain: number;
-    attack?: number;
-  }) {
+  private playSample(key: SampleKey, opts: { gain: number; rate?: number; offset?: number; duration?: number }) {
+    const buffer = this.sampleBuffers[key];
+    if (!buffer) return;
     const ctx = this.getCtx();
     const src = ctx.createBufferSource();
-    src.buffer = this.noiseBuffer!;
-    const filt = ctx.createBiquadFilter();
-    filt.type = opts.type;
-    filt.frequency.value = opts.freq;
-    filt.Q.value = opts.q;
+    src.buffer = buffer;
+    src.playbackRate.value = opts.rate ?? 1;
     const g = ctx.createGain();
-    src.connect(filt);
-    filt.connect(g);
+    src.connect(g);
     g.connect(this.master!);
-
     const now = ctx.currentTime;
-    const offset = Math.random() * Math.max(0.01, this.noiseBuffer!.duration - opts.duration - 0.05);
-    const attack = opts.attack ?? opts.duration * 0.15;
+    const attack = 0.015;
     g.gain.setValueAtTime(0, now);
     g.gain.linearRampToValueAtTime(opts.gain, now + attack);
-    g.gain.linearRampToValueAtTime(0, now + opts.duration);
-    src.start(now, offset, opts.duration);
-    src.stop(now + opts.duration + 0.02);
+    const dur = opts.duration ?? buffer.duration - (opts.offset ?? 0);
+    g.gain.setValueAtTime(opts.gain, Math.max(now, now + dur - 0.03));
+    g.gain.linearRampToValueAtTime(0, now + dur);
+    src.start(now, opts.offset ?? 0, dur);
+    src.stop(now + dur + 0.02);
     src.onended = () => {
       src.disconnect();
-      filt.disconnect();
       g.disconnect();
     };
   }
@@ -141,41 +174,28 @@ export class AmbientEngine {
     step();
   }
 
-  private fireTick = (level: number): number => {
-    if (level > 0) {
-      this.burst({
-        type: "bandpass",
-        freq: 900 + Math.random() * 2400,
-        q: 1.4,
-        duration: 0.035 + Math.random() * 0.06,
-        gain: LAYER_MAX.fire * (level / 100) * (0.35 + Math.random() * 0.65),
-      });
-    }
-    return level <= 0 ? 900 : Math.max(70, 110 + Math.random() * (700 - level * 4.5));
-  };
-
   private keysTick = (level: number): number => {
     if (level > 0) {
-      this.burst({
-        type: "highpass",
-        freq: 2800 + Math.random() * 1200,
-        q: 0.8,
-        duration: 0.016 + Math.random() * 0.014,
-        gain: LAYER_MAX.keys * (level / 100) * (0.45 + Math.random() * 0.55),
-      });
+      const buffer = this.sampleBuffers.keys;
+      if (buffer) {
+        const duration = Math.min(0.5, buffer.duration * 0.3);
+        const offset = Math.random() * Math.max(0, buffer.duration - duration);
+        this.playSample("keys", {
+          gain: LAYER_MAX.keys * (level / 100) * (0.5 + Math.random() * 0.5),
+          rate: 0.9 + Math.random() * 0.3,
+          offset,
+          duration,
+        });
+      }
     }
-    return level <= 0 ? 900 : Math.max(70, 90 + Math.random() * (900 - level * 6));
+    return level <= 0 ? 900 : Math.max(500, 1400 + Math.random() * (2600 - level * 16));
   };
 
   private thunderTick = (level: number): number => {
     if (level > 0 && Math.random() < 0.85) {
-      this.burst({
-        type: "lowpass",
-        freq: 110 + Math.random() * 60,
-        q: 0.7,
-        duration: 1.3 + Math.random() * 1.8,
-        gain: LAYER_MAX.thunder * (level / 100) * (0.6 + Math.random() * 0.4),
-        attack: 0.35,
+      this.playSample("thunder", {
+        gain: LAYER_MAX.thunder * (level / 100) * (0.7 + Math.random() * 0.3),
+        rate: 0.85 + Math.random() * 0.3,
       });
     }
     if (level <= 0) return 5000;
@@ -186,14 +206,15 @@ export class AmbientEngine {
   start() {
     const ctx = this.getCtx();
     if (ctx.state === "suspended") ctx.resume();
-    if (!this.built) {
-      this.buildContinuous("rain");
-      this.buildContinuous("wind");
-      this.buildContinuous("cafe");
-      this.built = true;
-    }
     this.playing = true;
-    this.scheduleLoop("fire", this.fireTick);
+    void this.loadBuffers().then(() => {
+      if (!this.playing || this.built) return;
+      this.buildLoopLayer("rain");
+      this.buildLoopLayer("wind");
+      this.buildLoopLayer("fire");
+      this.buildCafeSynth();
+      this.built = true;
+    });
     this.scheduleLoop("keys", this.keysTick);
     this.scheduleLoop("thunder", this.thunderTick);
   }
@@ -214,7 +235,7 @@ export class AmbientEngine {
 
   setLevel(key: LayerKey, value: number) {
     this.levels[key] = value;
-    const cont = this.continuous[key as "rain" | "wind" | "cafe"];
+    const cont = this.continuous[key];
     if (cont && this.ctx) {
       const target = (value / 100) * LAYER_MAX[key];
       cont.gain.gain.cancelScheduledValues(this.ctx.currentTime);
@@ -234,6 +255,7 @@ export class AmbientEngine {
     }
     this.continuous = {};
     this.built = false;
+    this.bufferLoadPromise = null;
   }
 }
 

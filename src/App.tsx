@@ -9,6 +9,7 @@ import { SCENES, type LevelState, type SceneKey } from "./lib/scenes";
 import { useLocalStorage } from "./lib/useLocalStorage";
 import { useIdle } from "./lib/useIdle";
 import { ambientEngine } from "./lib/audioEngine";
+import { useWeather } from "./lib/useWeather";
 
 const ACCENT = "#C96A3C";
 const COOL = "#7FA8A0";
@@ -28,6 +29,7 @@ const DEFAULT_SESSION: SessionData = {
 
 function App() {
   const { time, dateLine } = useClock();
+  const weather = useWeather();
   const idle = useIdle(30000);
 
   const [scene, setScene] = useLocalStorage<SceneKey>("cozyfocus.scene", "rain");
@@ -121,7 +123,7 @@ function App() {
         </div>
         <div className="flex items-center gap-2.5 mt-3.5 text-[13px]" style={{ color: "rgba(237,224,206,.48)" }}>
           <span className="rounded-full" style={{ width: 9, height: 9, background: COOL, boxShadow: `0 0 12px ${COOL}` }} />
-          <span>12&deg; &middot; light rain, Lisbon</span>
+          <span>{weather ? `${weather.tempC}° · ${weather.description}, Sydney` : "Sydney"}</span>
         </div>
         <SessionTaskCard session={session} onChange={setSession} />
       </div>
