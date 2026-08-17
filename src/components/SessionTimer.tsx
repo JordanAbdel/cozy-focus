@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export interface SessionData {
   title: string;
@@ -74,9 +74,36 @@ export function SessionTaskCard({ session, onChange }: { session: SessionData; o
   const [addingTask, setAddingTask] = useState(false);
   const [draft, setDraft] = useState("");
   const [editingTitle, setEditingTitle] = useState(false);
+  const removalTimers = useRef<Record<string, number>>({});
+
+  useEffect(() => {
+    const timers = removalTimers.current;
+    return () => {
+      Object.values(timers).forEach((id) => window.clearTimeout(id));
+    };
+  }, []);
 
   const toggleSubtask = (id: string) => {
-    onChange((prev) => ({ ...prev, subtasks: prev.subtasks.map((t) => (t.id === id ? { ...t, done: !t.done } : t)) }));
+    let nextDone = false;
+    onChange((prev) => ({
+      ...prev,
+      subtasks: prev.subtasks.map((t) => {
+        if (t.id !== id) return t;
+        nextDone = !t.done;
+        return { ...t, done: nextDone };
+      }),
+    }));
+
+    if (removalTimers.current[id]) {
+      window.clearTimeout(removalTimers.current[id]);
+      delete removalTimers.current[id];
+    }
+    if (nextDone) {
+      removalTimers.current[id] = window.setTimeout(() => {
+        onChange((prev) => ({ ...prev, subtasks: prev.subtasks.filter((t) => t.id !== id) }));
+        delete removalTimers.current[id];
+      }, 3000);
+    }
   };
 
   const addSubtask = () => {

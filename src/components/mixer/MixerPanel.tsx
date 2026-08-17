@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { LAYER_META, tintFor, type LevelState } from "../../lib/scenes";
 import { FaderColumn } from "./FaderColumn";
 import { Dial } from "./Dial";
@@ -9,7 +8,6 @@ interface Props {
   levels: LevelState;
   onLevelChange: (key: keyof LevelState, value: number) => void;
   mixerStyle: MixerStyle;
-  onMixerStyleChange: (style: MixerStyle) => void;
   accent: string;
   cool: string;
   presetLabel: string;
@@ -22,7 +20,6 @@ export function MixerPanel({
   levels,
   onLevelChange,
   mixerStyle,
-  onMixerStyleChange,
   accent,
   cool,
   presetLabel,
@@ -30,8 +27,6 @@ export function MixerPanel({
   audioOn,
   onToggleAudio,
 }: Props) {
-  const [settingsOpen, setSettingsOpen] = useState(true);
-
   return (
     <div
       className="rounded-[20px] border backdrop-blur-2xl"
@@ -65,42 +60,8 @@ export function MixerPanel({
           >
             {audioOn ? "❙❙" : "▶"}
           </button>
-          <button
-            onClick={() => setSettingsOpen((v) => !v)}
-            className="cursor-pointer w-[26px] h-[26px] rounded-full grid place-items-center border text-[12px]"
-            style={{ borderColor: "rgba(237,224,206,.14)", color: "rgba(237,224,206,.5)" }}
-          >
-            ⚙
-          </button>
         </div>
       </div>
-
-      {settingsOpen && (
-        <div
-          className="rounded-[14px] flex flex-col gap-2.5"
-          style={{ margin: "-6px 0 18px", padding: "14px 16px", background: "rgba(10,6,4,.4)", boxShadow: "inset 0 0 0 1px rgba(237,224,206,.07)" }}
-        >
-          <div className="text-[9px] tracking-[.22em] uppercase" style={{ color: "rgba(237,224,206,.32)" }}>
-            Control style
-          </div>
-          <div className="flex gap-2">
-            {(["faders", "dials"] as MixerStyle[]).map((s) => (
-              <button
-                key={s}
-                onClick={() => onMixerStyleChange(s)}
-                className="cursor-pointer px-3.5 py-[7px] rounded-full text-[11px] tracking-[.1em] uppercase border"
-                style={{
-                  color: mixerStyle === s ? "#EDE0CE" : "rgba(237,224,206,.45)",
-                  background: mixerStyle === s ? "rgba(201,106,60,.26)" : "transparent",
-                  borderColor: mixerStyle === s ? "rgba(232,160,92,.45)" : "rgba(237,224,206,.12)",
-                }}
-              >
-                {s === "faders" ? "Faders" : "Dials"}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       {mixerStyle === "faders" ? (
         <div className="flex gap-[22px]">

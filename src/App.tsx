@@ -4,6 +4,7 @@ import { SceneSwitcher } from "./components/SceneSwitcher";
 import { ArtworkSlot } from "./components/ArtworkSlot";
 import { MixerPanel, type MixerStyle } from "./components/mixer/MixerPanel";
 import { NowPlaying } from "./components/NowPlaying";
+import { SettingsPanel } from "./components/SettingsPanel";
 import { SessionTimerRing, SessionTaskCard, useSessionTicker, type SessionData } from "./components/SessionTimer";
 import { SCENES, type LevelState, type SceneKey } from "./lib/scenes";
 import { useLocalStorage } from "./lib/useLocalStorage";
@@ -40,6 +41,7 @@ function App() {
   // Not persisted: browsers require a fresh user gesture per page load before
   // audio can actually play, so a "playing" flag surviving reload would lie.
   const [audioOn, setAudioOn] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const sc = SCENES[scene];
 
@@ -128,7 +130,15 @@ function App() {
         <SessionTaskCard session={session} onChange={setSession} />
       </div>
 
-      <div className="absolute" style={{ right: 72, top: 64, ...chromeStyle }}>
+      <div className="absolute flex flex-col items-end gap-3" style={{ right: 72, top: 64, ...chromeStyle }}>
+        <button
+          onClick={() => setSettingsOpen(true)}
+          title="Settings"
+          className="cursor-pointer w-[26px] h-[26px] rounded-full grid place-items-center border text-[12px]"
+          style={{ borderColor: "rgba(237,224,206,.14)", color: "rgba(237,224,206,.5)" }}
+        >
+          ⚙
+        </button>
         <SessionTimerRing session={session} onChange={setSession} accent={ACCENT} />
       </div>
 
@@ -141,7 +151,6 @@ function App() {
           levels={levels}
           onLevelChange={handleLevelChange}
           mixerStyle={mixerStyle}
-          onMixerStyleChange={setMixerStyle}
           accent={ACCENT}
           cool={COOL}
           presetLabel={`${sc.label.toLowerCase()} preset`}
@@ -150,6 +159,15 @@ function App() {
           onToggleAudio={toggleAudio}
         />
       </div>
+
+      <SettingsPanel
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        mixerStyle={mixerStyle}
+        onMixerStyleChange={setMixerStyle}
+        session={session}
+        onSessionChange={setSession}
+      />
 
       <div style={chromeStyle}>
         <SceneSwitcher scene={scene} onChange={setScene} />
