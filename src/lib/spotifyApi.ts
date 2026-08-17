@@ -4,13 +4,45 @@ const BASE = "https://api.spotify.com/v1";
 
 export class PlaybackError extends Error {}
 
+// Set whenever Spotify responds 429, so subsequent calls back off instead of
+// hammering the API until the window it asked for has passed.
+let rateLimitedUntil = 0;
+
 async function authedFetch(path: string, init?: RequestInit) {
+  if (Date.now() < rateLimitedUntil) {
+    throw new PlaybackError("Spotify is rate-limiting requests. Try again in a moment.");
+  }
   const token = await getAccessToken();
   if (!token) throw new PlaybackError("Not connected to Spotify.");
-  return fetch(`${BASE}${path}`, {
+  const res = await fetch(`${BASE}${path}`, {
     ...init,
     headers: { ...(init?.headers ?? {}), Authorization: `Bearer ${token}` },
   });
+  if (res.status === 429) {
+    const seconds = Number(res.headers.get("Retry-After")) || 5;
+    rateLimitedUntil = Date.now() + seconds * 1000;
+  }
+  return res;
+}
+
+export interface NowPlayingTrack {
+  name: string;
+  artist: string;
+  albumArt: string | null;
+  isPlaying: boolean;
+}
+
+export async function fetchCurrentlyPlaying(): Promise<NowPlayingTrack | null> {
+  const res = await authedFetch("/me/player/currently-playing");
+  if (res.status === 204 || !res.ok) return null;
+  const data = await res.json();
+  if (!data?.item) return null;
+  return {
+    name: data.item.name,
+    artist: (data.item.artists as { name: string }[] | undefined)?.map((a) => a.name).join(", ") ?? "",
+    albumArt: data.item.album?.images?.[0]?.url ?? null,
+    isPlaying: !!data.is_playing,
+  };
 }
 
 export interface PlaylistSummary {

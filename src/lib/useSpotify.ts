@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { beginLogin, completeLogin, getAccessToken, isCallback, isConnected, logout } from "./spotifyAuth";
 import {
   PlaybackError,
+  fetchCurrentlyPlaying,
   fetchMyPlaylists,
   pausePlayback,
   playContext,
@@ -9,15 +10,9 @@ import {
   searchPlaylist,
   skipNext,
   skipPrevious,
+  type NowPlayingTrack,
   type PlaylistSummary,
 } from "./spotifyApi";
-
-export interface NowPlayingTrack {
-  name: string;
-  artist: string;
-  albumArt: string | null;
-  isPlaying: boolean;
-}
 
 const POLL_MS = 6000;
 
@@ -42,34 +37,24 @@ export function useSpotify() {
       return;
     }
     try {
-      const res = await fetch("https://api.spotify.com/v1/me/player/currently-playing", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.status === 204 || !res.ok) {
-        setTrack(null);
-        return;
-      }
-      const data = await res.json();
-      if (!data?.item) {
-        setTrack(null);
-        return;
-      }
-      setTrack({
-        name: data.item.name,
-        artist: (data.item.artists as { name: string }[] | undefined)?.map((a) => a.name).join(", ") ?? "",
-        albumArt: data.item.album?.images?.[0]?.url ?? null,
-        isPlaying: !!data.is_playing,
-      });
+      setTrack(await fetchCurrentlyPlaying());
     } catch {
-      // transient network error, keep last known track
+      // transient network or rate-limit error, keep last known track
     }
   }, []);
 
   useEffect(() => {
     if (!connected) return;
-    poll();
-    const id = window.setInterval(poll, POLL_MS);
-    return () => window.clearInterval(id);
+    const tick = () => {
+      if (!document.hidden) void poll();
+    };
+    tick();
+    const id = window.setInterval(tick, POLL_MS);
+    document.addEventListener("visibilitychange", tick);
+    return () => {
+      window.clearInterval(id);
+      document.removeEventListener("visibilitychange", tick);
+    };
   }, [connected, poll]);
 
   useEffect(() => {
@@ -77,7 +62,9 @@ export function useSpotify() {
       setPlaylists([]);
       return;
     }
-    fetchMyPlaylists().then(setPlaylists);
+    fetchMyPlaylists()
+      .then(setPlaylists)
+      .catch(() => setPlaylists([]));
   }, [connected]);
 
   const connect = useCallback(() => {

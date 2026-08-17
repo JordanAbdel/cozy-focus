@@ -5,8 +5,9 @@ import { ArtworkSlot } from "./components/ArtworkSlot";
 import { MixerPanel, type MixerStyle } from "./components/mixer/MixerPanel";
 import { NowPlaying } from "./components/NowPlaying";
 import { SettingsPanel } from "./components/SettingsPanel";
-import { SessionTimerRing, SessionTaskCard, useSessionTicker, type SessionData } from "./components/SessionTimer";
+import { SessionTimerRing, SessionTaskCard, useSessionTicker } from "./components/SessionTimer";
 import { SCENES, type LevelState, type SceneKey } from "./lib/scenes";
+import { reviveSession, type SessionData } from "./lib/sessionModel";
 import { useLocalStorage } from "./lib/useLocalStorage";
 import { useIdle } from "./lib/useIdle";
 import { ambientEngine } from "./lib/audioEngine";
@@ -18,13 +19,14 @@ const COOL = "#7FA8A0";
 const DEFAULT_LEVELS: LevelState = { rain: 72, fire: 44, cafe: 0, wind: 22, keys: 0, thunder: 16 };
 
 const DEFAULT_SESSION: SessionData = {
+  version: 2,
   title: "Finish the chapter on memory",
   durationMin: 45,
-  remainingSec: 45 * 60,
-  running: false,
+  endsAt: null,
+  pausedSec: 45 * 60,
   subtasks: [
-    { id: "a", text: "Re-read the two flagged pages", done: false },
-    { id: "b", text: "Notes into the outline", done: true },
+    { id: "a", text: "Re-read the two flagged pages", doneAt: null },
+    { id: "b", text: "Notes into the outline", doneAt: Date.now() },
   ],
 };
 
@@ -36,8 +38,13 @@ function App() {
   const [scene, setScene] = useLocalStorage<SceneKey>("cozyfocus.scene", "rain");
   const [mixerStyle, setMixerStyle] = useLocalStorage<MixerStyle>("cozyfocus.mixerStyle", "faders");
   const [levels, setLevels] = useLocalStorage<LevelState>("cozyfocus.levels", DEFAULT_LEVELS);
-  const [artwork, setArtwork] = useLocalStorage<string | null>("cozyfocus.artwork", null);
-  const [session, setSession] = useLocalStorage<SessionData>("cozyfocus.session", DEFAULT_SESSION);
+  const [artworkError, setArtworkError] = useState<string | null>(null);
+  const [artwork, setArtwork] = useLocalStorage<string | null>("cozyfocus.artwork", null, {
+    onWriteError: () => setArtworkError("That image is too large to save. Try a smaller one."),
+  });
+  const [session, setSession] = useLocalStorage<SessionData>("cozyfocus.session", DEFAULT_SESSION, {
+    revive: (raw) => reviveSession(raw, DEFAULT_SESSION),
+  });
   // Not persisted: browsers require a fresh user gesture per page load before
   // audio can actually play, so a "playing" flag surviving reload would lie.
   const [audioOn, setAudioOn] = useState(false);
@@ -45,7 +52,14 @@ function App() {
 
   const sc = SCENES[scene];
 
-  useSessionTicker(session, setSession);
+  const handleSessionComplete = useCallback(() => {
+    ambientEngine.playChime();
+    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+      new Notification("Session complete", { body: session.title, silent: true });
+    }
+  }, [session.title]);
+
+  useSessionTicker(session, setSession, handleSessionComplete);
 
   useEffect(() => {
     ambientEngine.setLevels(levels);
@@ -69,6 +83,14 @@ function App() {
 
   const toggleAudio = useCallback(() => setAudioOn((v) => !v), [setAudioOn]);
 
+  const handleArtworkChange = useCallback(
+    (dataUrl: string | null) => {
+      setArtworkError(null);
+      setArtwork(dataUrl);
+    },
+    [setArtwork],
+  );
+
   const chromeStyle = useMemo(
     () => ({
       opacity: idle ? 0 : 1,
@@ -80,7 +102,7 @@ function App() {
 
   return (
     <div className="relative w-screen h-screen overflow-hidden select-none" style={{ background: "#150E09" }}>
-      {scene === "art" && <ArtworkSlot image={artwork} onImageChange={setArtwork} />}
+      {scene === "art" && <ArtworkSlot image={artwork} onImageChange={handleArtworkChange} error={artworkError} />}
 
       <div className="absolute inset-0 pointer-events-none transition-fade" style={{ opacity: sc.base, background: sc.backdrop }} />
       <div className="absolute inset-0 pointer-events-none transition-fade" style={{ background: sc.overlay }} />
@@ -187,7 +209,7 @@ function App() {
           pointerEvents: "none",
         }}
       >
-        move to wake
+        tap or move to wake
       </div>
     </div>
   );

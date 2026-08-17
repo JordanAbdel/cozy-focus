@@ -32,9 +32,21 @@ export function Dial({ meta, tint, value, onChange, size = 82 }: Props) {
       dragging.current = false;
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", up);
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", up);
+    e.preventDefault();
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    const step = e.shiftKey ? 10 : 1;
+    if (e.key === "ArrowUp" || e.key === "ArrowRight") onChange(Math.min(100, value + step));
+    else if (e.key === "ArrowDown" || e.key === "ArrowLeft") onChange(Math.max(0, value - step));
+    else if (e.key === "Home") onChange(0);
+    else if (e.key === "End") onChange(100);
+    else return;
     e.preventDefault();
   };
 
@@ -42,6 +54,13 @@ export function Dial({ meta, tint, value, onChange, size = 82 }: Props) {
     <div className="flex flex-col items-center gap-2.5">
       <div
         onPointerDown={handlePointerDown}
+        onKeyDown={handleKeyDown}
+        role="slider"
+        tabIndex={0}
+        aria-valuenow={value}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={meta.label}
         className="relative rounded-full cursor-ns-resize grid place-items-center select-none touch-none"
         style={{
           width: size,

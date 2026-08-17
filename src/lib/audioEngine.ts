@@ -30,6 +30,8 @@ interface ContinuousNode {
 
 type Ctor = typeof AudioContext;
 
+const MASTER_FADE_SEC = 0.4;
+
 // Rain, wind and fire are real CC0 recordings (see public/audio/CREDITS.md),
 // looped through the Web Audio API. Café has no clean CC0 source, so it stays
 // synthesized (filtered noise). Keys and thunder are real one-shot samples
@@ -205,6 +207,10 @@ export class AmbientEngine {
 
   start() {
     const ctx = this.getCtx();
+    const now = ctx.currentTime;
+    this.master!.gain.cancelScheduledValues(now);
+    this.master!.gain.setValueAtTime(this.master!.gain.value, now);
+    this.master!.gain.linearRampToValueAtTime(1, now + MASTER_FADE_SEC);
     if (ctx.state === "suspended") ctx.resume();
     this.playing = true;
     void this.loadBuffers().then(() => {
@@ -226,7 +232,16 @@ export class AmbientEngine {
       if (id) window.clearTimeout(id);
     });
     this.timers = {};
-    if (this.ctx && this.ctx.state === "running") this.ctx.suspend();
+    const ctx = this.ctx;
+    if (ctx && ctx.state === "running" && this.master) {
+      const now = ctx.currentTime;
+      this.master.gain.cancelScheduledValues(now);
+      this.master.gain.setValueAtTime(this.master.gain.value, now);
+      this.master.gain.linearRampToValueAtTime(0, now + MASTER_FADE_SEC);
+      window.setTimeout(() => {
+        if (!this.playing && ctx.state === "running") ctx.suspend();
+      }, MASTER_FADE_SEC * 1000 + 30);
+    }
   }
 
   isPlaying() {
@@ -245,6 +260,31 @@ export class AmbientEngine {
 
   setLevels(levels: LevelState) {
     (Object.keys(levels) as LayerKey[]).forEach((k) => this.setLevel(k, levels[k]));
+  }
+
+  playChime() {
+    const ctx = this.getCtx();
+    if (ctx.state === "suspended") return;
+    const now = ctx.currentTime;
+    const notes = [523.25, 659.25, 783.99]; // soft ascending triad, C5-E5-G5
+    notes.forEach((freq, i) => {
+      const start = now + i * 0.14;
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0, start);
+      gain.gain.linearRampToValueAtTime(0.18, start + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 1.1);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 1.2);
+      osc.onended = () => {
+        osc.disconnect();
+        gain.disconnect();
+      };
+    });
   }
 
   dispose() {

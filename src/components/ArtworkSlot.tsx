@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 interface Props {
   image: string | null;
   onImageChange: (dataUrl: string | null) => void;
+  error?: string | null;
 }
 
 function resizeToDataUrl(file: File, maxDim = 1920): Promise<string> {
@@ -30,7 +31,7 @@ function resizeToDataUrl(file: File, maxDim = 1920): Promise<string> {
   });
 }
 
-export function ArtworkSlot({ image, onImageChange }: Props) {
+export function ArtworkSlot({ image, onImageChange, error }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -74,7 +75,28 @@ export function ArtworkSlot({ image, onImageChange }: Props) {
           <span className="text-[11px] tracking-[.14em] uppercase" style={{ color: "rgba(237,224,206,.42)" }}>
             {busy ? "Processing…" : "Drop lofi scene art, or click to browse"}
           </span>
+          {error && (
+            <span className="text-[11px] tracking-[.14em] uppercase" style={{ color: "rgba(237,224,206,.42)" }}>
+              {error}
+            </span>
+          )}
         </button>
+      )}
+      {image && error && (
+        <span
+          className="absolute text-[11px] tracking-[.14em] uppercase text-center"
+          style={{
+            bottom: 20,
+            left: "50%",
+            transform: "translateX(-50%)",
+            color: "rgba(237,224,206,.42)",
+            background: "rgba(14,9,6,.55)",
+            padding: "6px 14px",
+            borderRadius: 999,
+          }}
+        >
+          {error}
+        </span>
       )}
       {image && (
         <button

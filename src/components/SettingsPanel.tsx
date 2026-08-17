@@ -1,5 +1,5 @@
 import type { MixerStyle } from "./mixer/MixerPanel";
-import type { SessionData } from "./SessionTimer";
+import { isRunning, setDuration as applyDuration, type SessionData } from "../lib/sessionModel";
 
 interface Props {
   open: boolean;
@@ -15,11 +15,7 @@ export function SettingsPanel({ open, onClose, mixerStyle, onMixerStyleChange, s
 
   const setDuration = (min: number) => {
     const clamped = Math.max(1, Math.min(180, Math.round(min)));
-    onSessionChange((prev) => ({
-      ...prev,
-      durationMin: clamped,
-      remainingSec: prev.running ? prev.remainingSec : clamped * 60,
-    }));
+    onSessionChange((prev) => applyDuration(prev, clamped));
   };
 
   return (
@@ -99,7 +95,7 @@ export function SettingsPanel({ open, onClose, mixerStyle, onMixerStyleChange, s
               style={{ borderColor: "rgba(237,224,206,.25)", color: "rgba(237,224,206,.85)", width: 100 }}
             />
           </label>
-          {session.running && (
+          {isRunning(session) && (
             <div className="text-[11px]" style={{ color: "rgba(237,224,206,.4)" }}>
               This changes the timer's target length; the current countdown keeps running until you pause or reset it.
             </div>
