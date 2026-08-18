@@ -14,6 +14,7 @@ interface Props {
   onApplyPreset: () => void;
   audioOn: boolean;
   onToggleAudio: () => void;
+  compact?: boolean;
 }
 
 export function MixerPanel({
@@ -26,21 +27,30 @@ export function MixerPanel({
   onApplyPreset,
   audioOn,
   onToggleAudio,
+  compact = false,
 }: Props) {
   return (
+    // Compact drops its own card chrome and heading: the sheet around it already
+    // supplies the ground and the "Ambience" title.
     <div
-      className="rounded-[20px] border backdrop-blur-2xl"
-      style={{
-        padding: "22px 28px 20px",
-        borderColor: "rgba(237,224,206,.10)",
-        background: "rgba(38,24,16,.40)",
-        boxShadow: "0 30px 70px -28px rgba(0,0,0,.75), inset 0 1px 0 rgba(255,255,255,.06)",
-      }}
+      className={compact ? "" : "rounded-[20px] border backdrop-blur-2xl"}
+      style={
+        compact
+          ? undefined
+          : {
+              padding: "22px 28px 20px",
+              borderColor: "rgba(237,224,206,.10)",
+              background: "rgba(38,24,16,.40)",
+              boxShadow: "0 30px 70px -28px rgba(0,0,0,.75), inset 0 1px 0 rgba(255,255,255,.06)",
+            }
+      }
     >
-      <div className="flex items-center justify-between gap-7 mb-5">
-        <div className="text-[10px] tracking-[.22em] uppercase" style={{ color: "rgba(237,224,206,.3)" }}>
-          Ambience
-        </div>
+      <div className={`flex items-center gap-7 mb-5 ${compact ? "justify-end" : "justify-between"}`}>
+        {!compact && (
+          <div className="text-[10px] tracking-[.22em] uppercase" style={{ color: "rgba(237,224,206,.3)" }}>
+            Ambience
+          </div>
+        )}
         <div className="flex items-center gap-3">
           <button
             onClick={onApplyPreset}
@@ -64,13 +74,22 @@ export function MixerPanel({
       </div>
 
       {mixerStyle === "faders" ? (
-        <div className="flex gap-[22px]">
+        <div className={`flex${compact ? " justify-center" : ""}`} style={{ gap: compact ? 12 : 22 }}>
           {LAYER_META.map((m) => (
-            <FaderColumn key={m.key} meta={m} tint={tintFor(m.key, accent, cool)} value={levels[m.key]} onChange={(v) => onLevelChange(m.key, v)} />
+            <FaderColumn
+              key={m.key}
+              meta={m}
+              tint={tintFor(m.key, accent, cool)}
+              value={levels[m.key]}
+              onChange={(v) => onLevelChange(m.key, v)}
+              width={compact ? 30 : 34}
+              height={compact ? 150 : 186}
+              compact={compact}
+            />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-x-5 gap-y-6" style={{ width: 334 }}>
+        <div className="grid grid-cols-3 gap-x-5 gap-y-6" style={compact ? undefined : { width: 334 }}>
           {LAYER_META.map((m) => (
             <Dial key={m.key} meta={m} tint={tintFor(m.key, accent, cool)} value={levels[m.key]} onChange={(v) => onLevelChange(m.key, v)} />
           ))}

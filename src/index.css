@@ -134,8 +134,23 @@ a:hover {
   margin-top: 0;
   margin-bottom: 0;
 }
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+.sheet-panel {
+  animation: sheet-up 260ms ease;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .subtask-row {
     transition: none;
+  }
+  .sheet-panel {
+    animation: none;
   }
 }

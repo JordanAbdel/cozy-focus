@@ -3,19 +3,20 @@ import type { LayerKey, LevelState } from "./scenes";
 const LAYER_MAX: Record<LayerKey, number> = {
   rain: 0.55,
   wind: 0.4,
-  cafe: 0.2,
+  cafe: 0.45,
   fire: 0.6,
   keys: 0.5,
   thunder: 0.8,
 };
 
-type LoopKey = "rain" | "wind" | "fire";
+type LoopKey = "rain" | "wind" | "fire" | "cafe";
 type SampleKey = "keys" | "thunder";
 
 const LOOP_FILES: Record<LoopKey, string> = {
   rain: "/audio/rain.mp3",
   wind: "/audio/wind.mp3",
   fire: "/audio/fire.mp3",
+  cafe: "/audio/cafe.mp3",
 };
 
 const SAMPLE_FILES: Record<SampleKey, string> = {
@@ -32,14 +33,12 @@ type Ctor = typeof AudioContext;
 
 const MASTER_FADE_SEC = 0.4;
 
-// Rain, wind and fire are real CC0 recordings (see public/audio/CREDITS.md),
-// looped through the Web Audio API. Café has no clean CC0 source, so it stays
-// synthesized (filtered noise). Keys and thunder are real one-shot samples
+// Rain, wind, fire and café are real CC0 recordings (see public/audio/CREDITS.md),
+// looped through the Web Audio API. Keys and thunder are real one-shot samples
 // triggered at randomized intervals instead of played as loops.
 export class AmbientEngine {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
-  private noiseBuffer: AudioBuffer | null = null;
   private loopBuffers: Partial<Record<LoopKey, AudioBuffer>> = {};
   private sampleBuffers: Partial<Record<SampleKey, AudioBuffer>> = {};
   private bufferLoadPromise: Promise<void> | null = null;
@@ -57,17 +56,8 @@ export class AmbientEngine {
       this.master = this.ctx.createGain();
       this.master.gain.value = 1;
       this.master.connect(this.ctx.destination);
-      this.noiseBuffer = this.createNoiseBuffer(this.ctx);
     }
     return this.ctx;
-  }
-
-  private createNoiseBuffer(ctx: AudioContext): AudioBuffer {
-    const length = ctx.sampleRate * 3;
-    const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < length; i++) data[i] = Math.random() * 2 - 1;
-    return buffer;
   }
 
   private async loadBuffers(): Promise<void> {
@@ -112,32 +102,6 @@ export class AmbientEngine {
     gain.connect(this.master!);
     source.start();
     this.continuous[key] = { source, gain };
-  }
-
-  private buildCafeSynth() {
-    if (this.continuous.cafe) return;
-    const ctx = this.getCtx();
-    const source = ctx.createBufferSource();
-    source.buffer = this.noiseBuffer!;
-    source.loop = true;
-    const filter = ctx.createBiquadFilter();
-    filter.type = "bandpass";
-    filter.frequency.value = 900;
-    filter.Q.value = 0.6;
-    const lfo = ctx.createOscillator();
-    lfo.frequency.value = 0.15;
-    const lfoGain = ctx.createGain();
-    lfoGain.gain.value = 150;
-    lfo.connect(lfoGain);
-    lfoGain.connect(filter.frequency);
-    lfo.start();
-    const gain = ctx.createGain();
-    gain.gain.value = (this.levels.cafe / 100) * LAYER_MAX.cafe;
-    source.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.master!);
-    source.start();
-    this.continuous.cafe = { source, gain };
   }
 
   private playSample(key: SampleKey, opts: { gain: number; rate?: number; offset?: number; duration?: number }) {
@@ -218,7 +182,7 @@ export class AmbientEngine {
       this.buildLoopLayer("rain");
       this.buildLoopLayer("wind");
       this.buildLoopLayer("fire");
-      this.buildCafeSynth();
+      this.buildLoopLayer("cafe");
       this.built = true;
     });
     this.scheduleLoop("keys", this.keysTick);

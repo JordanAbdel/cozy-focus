@@ -6,10 +6,14 @@ import { MixerPanel, type MixerStyle } from "./components/mixer/MixerPanel";
 import { NowPlaying } from "./components/NowPlaying";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { SessionTimerRing, SessionTaskCard, useSessionTicker } from "./components/SessionTimer";
+import { CompactLayout } from "./components/CompactLayout";
 import { SCENES, type LevelState, type SceneKey } from "./lib/scenes";
-import { reviveSession, type SessionData } from "./lib/sessionModel";
+import { isRunning, reviveSession, type SessionData } from "./lib/sessionModel";
 import { useLocalStorage } from "./lib/useLocalStorage";
 import { useIdle } from "./lib/useIdle";
+import { useMediaQuery } from "./lib/useMediaQuery";
+import { useWakeLock } from "./lib/useWakeLock";
+import { useFullscreen } from "./lib/useFullscreen";
 import { ambientEngine } from "./lib/audioEngine";
 import { useWeather } from "./lib/useWeather";
 
@@ -34,6 +38,10 @@ function App() {
   const { time, dateLine } = useClock();
   const weather = useWeather();
   const idle = useIdle(30000);
+  const fullscreen = useFullscreen();
+  // 520px Now Playing + 390px mixer + two 72px margins = 1054px before any gap
+  // between the columns, so below this the four-corner layout collides.
+  const isDesktop = useMediaQuery("(min-width: 1080px)");
 
   const [scene, setScene] = useLocalStorage<SceneKey>("cozyfocus.scene", "rain");
   const [mixerStyle, setMixerStyle] = useLocalStorage<MixerStyle>("cozyfocus.mixerStyle", "faders");
@@ -60,6 +68,10 @@ function App() {
   }, [session.title]);
 
   useSessionTicker(session, setSession, handleSessionComplete);
+
+  // Keyed to the countdown, not to ambience: the screen should stay lit for a
+  // timer you are watching, not for audio you can hear with the lid shut.
+  useWakeLock(isRunning(session));
 
   useEffect(() => {
     ambientEngine.setLevels(levels);
@@ -134,53 +146,97 @@ function App() {
       />
       <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: "var(--grain)", mixBlendMode: "soft-light", opacity: 0.5 }} />
 
-      <div
-        className="absolute font-serif-cf transition-fade"
-        style={{ left: 72, top: 64, fontSize: 92, lineHeight: 0.92, letterSpacing: "-.02em", color: `rgba(237,224,206,${idle ? 0.2 : 0.92})`, textShadow: "0 2px 26px rgba(0,0,0,.5)" }}
-      >
-        {time}
-      </div>
+      {isDesktop ? (
+        <>
+          <div
+            className="absolute font-serif-cf transition-fade"
+            style={{ left: 72, top: 64, fontSize: 92, lineHeight: 0.92, letterSpacing: "-.02em", color: `rgba(237,224,206,${idle ? 0.2 : 0.92})`, textShadow: "0 2px 26px rgba(0,0,0,.5)" }}
+          >
+            {time}
+          </div>
 
-      <div className="absolute" style={{ left: 72, top: 64 + 92 + 6, ...chromeStyle }}>
-        <div className="font-serif-cf italic" style={{ fontSize: 19, color: "rgba(237,224,206,.56)" }}>
-          {dateLine}
-        </div>
-        <div className="flex items-center gap-2.5 mt-3.5 text-[13px]" style={{ color: "rgba(237,224,206,.48)" }}>
-          <span className="rounded-full" style={{ width: 9, height: 9, background: COOL, boxShadow: `0 0 12px ${COOL}` }} />
-          <span>{weather ? `${weather.tempC}° · ${weather.description}, Sydney` : "Sydney"}</span>
-        </div>
-        <SessionTaskCard session={session} onChange={setSession} />
-      </div>
+          <div className="absolute" style={{ left: 72, top: 64 + 92 + 6, ...chromeStyle }}>
+            <div className="font-serif-cf italic" style={{ fontSize: 19, color: "rgba(237,224,206,.56)" }}>
+              {dateLine}
+            </div>
+            <div className="flex items-center gap-2.5 mt-3.5 text-[13px]" style={{ color: "rgba(237,224,206,.48)" }}>
+              <span className="rounded-full" style={{ width: 9, height: 9, background: COOL, boxShadow: `0 0 12px ${COOL}` }} />
+              <span>{weather ? `${weather.tempC}° · ${weather.description}, Sydney` : "Sydney"}</span>
+            </div>
+            <SessionTaskCard session={session} onChange={setSession} />
+          </div>
 
-      <div className="absolute flex flex-col items-end gap-3" style={{ right: 72, top: 64, ...chromeStyle }}>
-        <button
-          onClick={() => setSettingsOpen(true)}
-          title="Settings"
-          className="cursor-pointer w-[26px] h-[26px] rounded-full grid place-items-center border text-[12px]"
-          style={{ borderColor: "rgba(237,224,206,.14)", color: "rgba(237,224,206,.5)" }}
-        >
-          ⚙
-        </button>
-        <SessionTimerRing session={session} onChange={setSession} accent={ACCENT} />
-      </div>
+          <div className="absolute flex flex-col items-end gap-3" style={{ right: 72, top: 64, ...chromeStyle }}>
+            <div className="flex items-center gap-2">
+              {fullscreen.supported && (
+                <button
+                  onClick={fullscreen.toggle}
+                  title={fullscreen.isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                  aria-label={fullscreen.isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                  className="cursor-pointer w-[26px] h-[26px] rounded-full grid place-items-center border text-[12px]"
+                  style={{ borderColor: "rgba(237,224,206,.14)", color: "rgba(237,224,206,.5)" }}
+                >
+                  {fullscreen.isFullscreen ? "⤡" : "⤢"}
+                </button>
+              )}
+              <button
+                onClick={() => setSettingsOpen(true)}
+                title="Settings"
+                className="cursor-pointer w-[26px] h-[26px] rounded-full grid place-items-center border text-[12px]"
+                style={{ borderColor: "rgba(237,224,206,.14)", color: "rgba(237,224,206,.5)" }}
+              >
+                ⚙
+              </button>
+            </div>
+            <SessionTimerRing session={session} onChange={setSession} accent={ACCENT} />
+          </div>
 
-      <div className="absolute" style={{ left: 72, bottom: 64, ...chromeStyle }}>
-        <NowPlaying />
-      </div>
+          <div className="absolute" style={{ left: 72, bottom: 64, ...chromeStyle }}>
+            <NowPlaying />
+          </div>
 
-      <div className="absolute" style={{ right: 72, bottom: 64, ...chromeStyle }}>
-        <MixerPanel
+          <div className="absolute" style={{ right: 72, bottom: 64, ...chromeStyle }}>
+            <MixerPanel
+              levels={levels}
+              onLevelChange={handleLevelChange}
+              mixerStyle={mixerStyle}
+              accent={ACCENT}
+              cool={COOL}
+              presetLabel={`${sc.label.toLowerCase()} preset`}
+              onApplyPreset={applyPreset}
+              audioOn={audioOn}
+              onToggleAudio={toggleAudio}
+            />
+          </div>
+
+          <div style={chromeStyle}>
+            <SceneSwitcher scene={scene} onChange={setScene} />
+          </div>
+        </>
+      ) : (
+        <CompactLayout
+          time={time}
+          dateLine={dateLine}
+          weather={weather}
+          accent={ACCENT}
+          cool={COOL}
+          idle={idle}
+          chromeStyle={chromeStyle}
+          session={session}
+          onSessionChange={setSession}
           levels={levels}
           onLevelChange={handleLevelChange}
           mixerStyle={mixerStyle}
-          accent={ACCENT}
-          cool={COOL}
           presetLabel={`${sc.label.toLowerCase()} preset`}
           onApplyPreset={applyPreset}
           audioOn={audioOn}
           onToggleAudio={toggleAudio}
+          scene={scene}
+          onSceneChange={setScene}
+          onOpenSettings={() => setSettingsOpen(true)}
+          fullscreen={fullscreen}
         />
-      </div>
+      )}
 
       <SettingsPanel
         open={settingsOpen}
@@ -191,14 +247,11 @@ function App() {
         onSessionChange={setSession}
       />
 
-      <div style={chromeStyle}>
-        <SceneSwitcher scene={scene} onChange={setScene} />
-      </div>
-
       <div
         className="absolute left-1/2 anim-breathe"
         style={{
-          bottom: 52,
+          // Clears the compact control bar, which occupies the bottom ~100px.
+          bottom: isDesktop ? 52 : 112,
           transform: "translateX(-50%)",
           fontSize: 11,
           letterSpacing: ".26em",

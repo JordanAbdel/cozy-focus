@@ -21,7 +21,7 @@ export function SpotifyLibrary({ open, onClose, playlists, onPlayPlaylist, onPla
         onClick={(e) => e.stopPropagation()}
         className="rounded-[20px] border backdrop-blur-2xl flex flex-col gap-6"
         style={{
-          width: 420,
+          width: "min(420px, calc(100vw - 32px))",
           maxHeight: "72vh",
           padding: "26px 28px",
           borderColor: "rgba(237,224,206,.10)",

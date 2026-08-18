@@ -28,7 +28,7 @@ export function SettingsPanel({ open, onClose, mixerStyle, onMixerStyleChange, s
         onClick={(e) => e.stopPropagation()}
         className="rounded-[20px] border backdrop-blur-2xl flex flex-col gap-6"
         style={{
-          width: 380,
+          width: "min(380px, calc(100vw - 32px))",
           padding: "26px 28px",
           borderColor: "rgba(237,224,206,.10)",
           background: "rgba(38,24,16,.94)",

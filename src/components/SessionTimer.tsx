@@ -61,7 +61,17 @@ export function useSessionTicker(session: SessionData, onChange: OnChange, onCom
   }, [session.endsAt, onChange, onComplete]);
 }
 
-export function SessionTimerRing({ session, onChange, accent }: { session: SessionData; onChange: OnChange; accent: string }) {
+export function SessionTimerRing({
+  session,
+  onChange,
+  accent,
+  align = "end",
+}: {
+  session: SessionData;
+  onChange: OnChange;
+  accent: string;
+  align?: "end" | "center";
+}) {
   const toggleRunning = () => {
     if (!isRunning(session) && typeof Notification !== "undefined" && Notification.permission === "default") {
       void Notification.requestPermission();
@@ -77,7 +87,7 @@ export function SessionTimerRing({ session, onChange, accent }: { session: Sessi
   const sweep = Math.max(0, Math.min(360, fraction * 360));
 
   return (
-    <div className="flex flex-col items-end gap-3">
+    <div className={`flex flex-col gap-3 ${align === "center" ? "items-center" : "items-end"}`}>
       <button
         onClick={toggleRunning}
         className="relative rounded-full grid place-items-center cursor-pointer select-none"

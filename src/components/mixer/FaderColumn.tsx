@@ -8,9 +8,10 @@ interface Props {
   onChange: (value: number) => void;
   height?: number;
   width?: number;
+  compact?: boolean;
 }
 
-export function FaderColumn({ meta, tint, value, onChange, height = 186, width = 34 }: Props) {
+export function FaderColumn({ meta, tint, value, onChange, height = 186, width = 34, compact = false }: Props) {
   const trackRef = useRef<HTMLDivElement | null>(null);
   const dragging = useRef(false);
 
@@ -91,8 +92,10 @@ export function FaderColumn({ meta, tint, value, onChange, height = 186, width =
         />
       </div>
       <div className="text-center">
+        {/* The short name keeps neighbouring columns from colliding when narrow;
+            aria-label on the slider still carries the full one. */}
         <div className="text-[10px] tracking-[.1em] uppercase" style={{ color: "rgba(237,224,206,.5)" }}>
-          {meta.label}
+          {compact ? meta.short : meta.label}
         </div>
         <div className="text-[10px] mt-[3px]" style={{ color: "rgba(237,224,206,.28)" }}>
           {value === 0 ? "off" : value}
